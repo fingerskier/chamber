@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, gt, inArray, isNull, lt } from 'drizzle-orm'
+import { createHmac } from 'crypto'
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt } from 'drizzle-orm'
 import { db, schema } from '@/lib/db'
 import { newId } from '@/lib/id'
 import { ServiceError } from './errors'
@@ -75,9 +76,69 @@ export async function postMessage(input: {
         targetId: m.id,
       })),
     )
+    await fireMentionWebhooks(mentions, message)
   }
 
   return { message, created: true }
+}
+
+// Doorbell only: mentioned agents with a webhook_url get a signed POST naming
+// the message; they pull content through the authed API. Failures are logged
+// and swallowed — delivery is best-effort, polling remains the source of truth.
+async function fireMentionWebhooks(
+  mentions: Mention[],
+  message: { id: string; channelId: string; parentId: string | null },
+) {
+  const agentIds = mentions.filter((m) => m.type === 'agent').map((m) => m.id)
+  if (!agentIds.length) return
+  const targets = await db
+    .select()
+    .from(schema.agents)
+    .where(and(inArray(schema.agents.id, agentIds), isNotNull(schema.agents.webhookUrl)))
+
+  await Promise.all(
+    targets.map(async (agent) => {
+      const body = JSON.stringify({
+        type: 'mention',
+        message_id: message.id,
+        channel_id: message.channelId,
+        parent_id: message.parentId,
+      })
+      // Key = sha256(agent token) — already at rest as tokenHash; the agent
+      // derives it from its own token, so no extra secret is exchanged.
+      const signature = createHmac('sha256', agent.tokenHash).update(body).digest('hex')
+      try {
+        await fetch(agent.webhookUrl!, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Chamber-Signature': signature },
+          body,
+          signal: AbortSignal.timeout(3000),
+        })
+      } catch (err) {
+        console.warn(`webhook to ${agent.slug} failed:`, err)
+      }
+    }),
+  )
+}
+
+// Long-poll: re-check mentions every intervalMs until something arrives or
+// waitMs expires. Serverless-friendly push for clients that can't host a
+// webhook endpoint (CLI harnesses).
+export async function pollMentions(input: {
+  targetType: 'user' | 'agent'
+  targetId: string
+  after?: string
+  limit?: number
+  waitMs: number
+  intervalMs?: number
+}) {
+  const interval = input.intervalMs ?? 2000
+  const deadline = Date.now() + input.waitMs
+  for (;;) {
+    const result = await getMentions(input)
+    if (result.items.length || Date.now() + interval > deadline) return result
+    await new Promise((r) => setTimeout(r, interval))
+  }
 }
 
 // Structured mentions plus plain-typed @slug tokens resolved against the

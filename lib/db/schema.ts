@@ -80,6 +80,7 @@ export const agents = pgTable('agents', {
   slug: text('slug').notNull().unique(),
   description: text('description'),
   tokenHash: text('token_hash').notNull(),
+  webhookUrl: text('webhook_url'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

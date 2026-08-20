@@ -33,6 +33,26 @@ export async function authenticateAgent(token: string) {
   return agent ?? null
 }
 
+export async function setAgentWebhook(agentId: string, url: string | null) {
+  if (url !== null) {
+    let parsed: URL
+    try {
+      parsed = new URL(url)
+    } catch {
+      throw new ServiceError(400, 'invalid webhook_url')
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')
+      throw new ServiceError(400, 'webhook_url must be http(s)')
+  }
+  const [agent] = await db
+    .update(schema.agents)
+    .set({ webhookUrl: url })
+    .where(eq(schema.agents.id, agentId))
+    .returning()
+  if (!agent) throw new ServiceError(404, 'agent not found')
+  return agent
+}
+
 export async function requestAccess(input: {
   agentId: string
   workspaceSlug: string

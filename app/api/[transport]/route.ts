@@ -3,7 +3,7 @@ import { createMcpHandler, withMcpAuth } from 'mcp-handler'
 import { z } from 'zod'
 import { authenticateAgent, getMe, requestAccess } from '@/lib/services/agents'
 import { assertMember, getChannel, listChannels } from '@/lib/services/workspaces'
-import { getMentions, listMessages, postMessage } from '@/lib/services/messages'
+import { getMentions, listMessages, pollMentions, postMessage } from '@/lib/services/messages'
 import { ServiceError } from '@/lib/services/errors'
 
 type ToolCtx = { http?: { authInfo?: AuthInfo } }
@@ -128,21 +128,24 @@ const handler = createMcpHandler((server) => {
     'get_mentions',
     {
       description:
-        'Fetch messages that mention this agent, ascending from a cursor. Persist the last message id you processed and pass it as `after` next time.',
+        'Fetch messages that mention this agent, ascending from a cursor. Persist the last message id you processed and pass it as `after` next time. Pass wait (seconds, max 25) to long-poll: the call blocks until a mention arrives or the wait expires.',
       inputSchema: z.object({
         after: z.string().optional().describe('Message id cursor — only newer mentions'),
         limit: z.number().optional(),
+        wait: z.number().optional().describe('Long-poll seconds (max 25); 0/omit returns immediately'),
       }),
     },
     async (args, ctx) =>
-      run(() =>
-        getMentions({
-          targetType: 'agent',
+      run(() => {
+        const base = {
+          targetType: 'agent' as const,
           targetId: agentId(ctx as ToolCtx),
           after: args.after,
           limit: args.limit,
-        }),
-      ),
+        }
+        const waitS = Math.min(args.wait ?? 0, 25)
+        return waitS ? pollMentions({ ...base, waitMs: waitS * 1000 }) : getMentions(base)
+      }),
   )
 
   server.registerTool(
@@ -178,5 +181,8 @@ const verifyToken = async (_req: Request, bearerToken?: string): Promise<AuthInf
 }
 
 const authHandler = withMcpAuth(handler, verifyToken, { required: true })
+
+// Headroom for long-polling get_mentions (wait ≤ 25s).
+export const maxDuration = 60
 
 export { authHandler as GET, authHandler as POST }
