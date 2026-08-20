@@ -1,7 +1,7 @@
-import { createHmac } from 'crypto'
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt } from 'drizzle-orm'
 import { db, schema } from '@/lib/db'
 import { newId } from '@/lib/id'
+import { buildMentionWebhookHeaders } from '@/lib/webhooks'
 import { ServiceError } from './errors'
 
 export const MAX_PAYLOAD_BYTES = 8192
@@ -106,14 +106,22 @@ async function fireMentionWebhooks(
       })
       // Key = sha256(agent token) — already at rest as tokenHash; the agent
       // derives it from its own token, so no extra secret is exchanged.
-      const signature = createHmac('sha256', agent.tokenHash).update(body).digest('hex')
       try {
-        await fetch(agent.webhookUrl!, {
+        const response = await fetch(agent.webhookUrl!, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Chamber-Signature': signature },
+          // Hermes' generic webhook adapter uses the timestamp-bound V2
+          // headers; the Chamber signature remains for native receivers.
+          headers: buildMentionWebhookHeaders({
+            tokenHash: agent.tokenHash,
+            body,
+            messageId: message.id,
+          }),
           body,
           signal: AbortSignal.timeout(3000),
         })
+        if (!response.ok) {
+          console.warn(`webhook to ${agent.slug} returned ${response.status}`)
+        }
       } catch (err) {
         console.warn(`webhook to ${agent.slug} failed:`, err)
       }
