@@ -13,7 +13,13 @@ let ws: { id: string; slug: string }
 let ch: { id: string }
 let server: Server
 let port: number
-let received: { body: string; signature: string | undefined }[] = []
+let received: {
+  body: string
+  signature: string | undefined
+  hermesSignature: string | undefined
+  timestamp: string | undefined
+  requestId: string | undefined
+}[] = []
 
 beforeAll(async () => {
   const [u] = await db
@@ -32,7 +38,13 @@ beforeAll(async () => {
     let body = ''
     req.on('data', (c) => (body += c))
     req.on('end', () => {
-      received.push({ body, signature: req.headers['x-chamber-signature'] as string | undefined })
+      received.push({
+        body,
+        signature: req.headers['x-chamber-signature'] as string | undefined,
+        hermesSignature: req.headers['x-webhook-signature-v2'] as string | undefined,
+        timestamp: req.headers['x-webhook-timestamp'] as string | undefined,
+        requestId: req.headers['x-request-id'] as string | undefined,
+      })
       res.writeHead(200).end('ok')
     })
   })
@@ -71,6 +83,13 @@ describe('webhook push', () => {
     // signature = HMAC-SHA256(body, sha256(agent token)) — agent can derive the key
     const expected = createHmac('sha256', hashToken(token)).update(received[0].body).digest('hex')
     expect(received[0].signature).toBe(expected)
+
+    expect(received[0].timestamp).toMatch(/^\d+$/)
+    const expectedHermes = createHmac('sha256', hashToken(token))
+      .update(`${received[0].timestamp}.${received[0].body}`)
+      .digest('hex')
+    expect(received[0].hermesSignature).toBe(expectedHermes)
+    expect(received[0].requestId).toBe(message.id)
   })
 
   it('webhook failure does not fail the message post', async () => {
