@@ -13,11 +13,16 @@ export default async function DashboardPage() {
     <main className="mx-auto max-w-2xl p-8">
       <div className="mb-8 flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Workspaces</h1>
-        <form action={signOutAction}>
-          <button type="submit" className="text-sm text-gray-500 hover:underline">
-            Sign out ({session.user.name})
-          </button>
-        </form>
+        <div className="flex items-center gap-4">
+          <Link href="/settings" className="text-sm text-gray-500 hover:underline">
+            Settings
+          </Link>
+          <form action={signOutAction}>
+            <button type="submit" className="text-sm text-gray-500 hover:underline">
+              Sign out ({session.user.name})
+            </button>
+          </form>
+        </div>
       </div>
 
       <ul className="mb-8 space-y-2">

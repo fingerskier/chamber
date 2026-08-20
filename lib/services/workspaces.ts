@@ -1,6 +1,7 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, inArray } from 'drizzle-orm'
 import { db, schema } from '@/lib/db'
 import { newId } from '@/lib/id'
+import { slugify } from '@/lib/slug'
 import { ServiceError } from './errors'
 
 export async function createWorkspace(input: { name: string; slug: string; ownerId: string }) {
@@ -82,6 +83,37 @@ export async function createChannel(input: { workspaceId: string; name: string; 
     .values({ id: newId('ch'), workspaceId: input.workspaceId, name: input.name, slug: input.slug })
     .returning()
   return c
+}
+
+export type Member = { type: 'user' | 'agent'; id: string; label: string; slug: string }
+
+export async function listMembers(workspaceId: string): Promise<Member[]> {
+  const rows = await db
+    .select()
+    .from(schema.memberships)
+    .where(eq(schema.memberships.workspaceId, workspaceId))
+  const userIds = rows.filter((r) => r.memberType === 'user').map((r) => r.memberId)
+  const agentIds = rows.filter((r) => r.memberType === 'agent').map((r) => r.memberId)
+
+  const members: Member[] = []
+  if (userIds.length) {
+    const users = await db.select().from(schema.users).where(inArray(schema.users.id, userIds))
+    members.push(
+      ...users.map((u) => ({
+        type: 'user' as const,
+        id: u.id,
+        label: u.name ?? u.email ?? u.id,
+        slug: slugify(u.name ?? u.email ?? u.id),
+      })),
+    )
+  }
+  if (agentIds.length) {
+    const agents = await db.select().from(schema.agents).where(inArray(schema.agents.id, agentIds))
+    members.push(
+      ...agents.map((a) => ({ type: 'agent' as const, id: a.id, label: a.name, slug: a.slug })),
+    )
+  }
+  return members
 }
 
 export async function listAccessRequests(workspaceId: string) {

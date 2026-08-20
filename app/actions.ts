@@ -56,12 +56,27 @@ export async function postMessageAction(
   await assertMember(channel.workspaceId, 'user', userId)
   const content = String(formData.get('content') ?? '').trim()
   if (!content) return
+  let mentions: { type: 'user' | 'agent'; id: string }[] | undefined
+  try {
+    const raw = JSON.parse(String(formData.get('mentions') ?? '[]'))
+    if (Array.isArray(raw)) {
+      mentions = raw
+        .filter(
+          (m): m is { type: 'user' | 'agent'; id: string } =>
+            (m?.type === 'user' || m?.type === 'agent') && typeof m?.id === 'string',
+        )
+        .slice(0, 20)
+    }
+  } catch {
+    // malformed mentions field — post without mentions
+  }
   await postMessage({
     channelId,
     senderType: 'user',
     senderId: userId,
     content,
     parentId: parentId ?? undefined,
+    mentions,
   })
   revalidatePath(path)
 }

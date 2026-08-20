@@ -3,10 +3,17 @@ import { redirect } from 'next/navigation'
 import { inArray } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { db, schema } from '@/lib/db'
-import { assertMember, getChannelBySlug, getWorkspaceBySlug } from '@/lib/services/workspaces'
+import {
+  assertMember,
+  getChannelBySlug,
+  getWorkspaceBySlug,
+  listMembers,
+} from '@/lib/services/workspaces'
 import { listMessages } from '@/lib/services/messages'
 import { postMessageAction } from '@/app/actions'
 import Poller from '@/app/components/Poller'
+import Compose from '@/app/components/Compose'
+import MessageContent from '@/app/components/MessageContent'
 
 type Msg = typeof schema.messages.$inferSelect
 
@@ -44,7 +51,10 @@ export default async function ChannelPage({
         .from(schema.messages)
         .where(inArray(schema.messages.parentId, roots.map((m) => m.id)))
     : []
-  const names = await senderNames([...roots, ...replies])
+  const [names, members] = await Promise.all([
+    senderNames([...roots, ...replies]),
+    listMembers(ws.id),
+  ])
   const byParent = new Map<string, Msg[]>()
   for (const r of replies) {
     const list = byParent.get(r.parentId!) ?? []
@@ -73,7 +83,7 @@ export default async function ChannelPage({
               </span>{' '}
               · {m.createdAt.toISOString()}
             </p>
-            <p className="whitespace-pre-wrap">{m.content}</p>
+            <MessageContent content={m.content} />
             {(byParent.get(m.id) ?? []).map((r) => (
               <div key={r.id} className="mt-2 ml-6 border-l pl-3">
                 <p className="text-xs text-gray-500">
@@ -82,41 +92,27 @@ export default async function ChannelPage({
                   </span>{' '}
                   · {r.createdAt.toISOString()}
                 </p>
-                <p className="whitespace-pre-wrap">{r.content}</p>
+                <MessageContent content={r.content} />
               </div>
             ))}
-            <form
-              action={postMessageAction.bind(null, channel.id, path, m.id)}
-              className="mt-2 ml-6 flex gap-2"
-            >
-              <input
-                name="content"
+            <div className="mt-2 ml-6">
+              <Compose
+                members={members}
+                action={postMessageAction.bind(null, channel.id, path, m.id)}
                 placeholder="Reply in thread…"
-                className="flex-1 rounded-md border px-2 py-1 text-sm"
+                compact
               />
-              <button type="submit" className="rounded-md border px-3 py-1 text-sm">
-                Reply
-              </button>
-            </form>
+            </div>
           </li>
         ))}
         {ordered.length === 0 && <li className="text-sm text-gray-500">No messages yet.</li>}
       </ul>
 
-      <form
+      <Compose
+        members={members}
         action={postMessageAction.bind(null, channel.id, path, null)}
-        className="flex gap-2"
-      >
-        <input
-          name="content"
-          placeholder={`Message # ${channel.slug}`}
-          className="flex-1 rounded-md border px-3 py-2"
-          required
-        />
-        <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-white">
-          Send
-        </button>
-      </form>
+        placeholder={`Message # ${channel.slug} — type @ to mention`}
+      />
     </main>
   )
 }
