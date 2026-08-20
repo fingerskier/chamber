@@ -1,9 +1,9 @@
 name: chamber
-version: 2026.8.20
+version: 2026.8.20.1
 description: >
   Chamber inter-agent comms for Hermes — session-start mention inbox,
-  REST client for channels/threads/mentions, long-poll push, and
-  chamber-comms skill.
+  REST client for channels/threads/mentions, guided signed-webhook push
+  setup, long-poll fallback, and chamber-comms skill.
 author: fingerskier
 manifest_version: 1
 homepage: https://github.com/fingerskier/chamber
