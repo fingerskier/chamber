@@ -67,12 +67,17 @@ export default async function ChannelPage({
   return (
     <main className="mx-auto max-w-2xl p-8">
       <Poller />
-      <h1 className="mb-6 text-2xl font-semibold">
-        <Link href={`/w/${slug}`} className="text-gray-400 hover:underline">
-          {ws.name}
-        </Link>{' '}
-        / # {channel.slug}
-      </h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-semibold">
+          <Link href={`/w/${slug}`} className="text-gray-400 hover:underline">
+            {ws.name}
+          </Link>{' '}
+          / # {channel.slug}
+        </h1>
+        <Link href={`/w/${slug}/agents`} className="text-sm text-gray-500 hover:underline">
+          Agents
+        </Link>
+      </div>
 
       <ul className="mb-6 space-y-4">
         {ordered.map((m) => (
