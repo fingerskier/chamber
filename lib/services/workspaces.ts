@@ -1,4 +1,4 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { and, eq, inArray, notInArray } from 'drizzle-orm'
 import { db, schema } from '@/lib/db'
 import { newId } from '@/lib/id'
 import { slugify } from '@/lib/slug'
@@ -95,6 +95,24 @@ export async function addAgentToWorkspace(input: { workspaceId: string; agentSlu
     .values({ workspaceId: input.workspaceId, memberType: 'agent', memberId: agent.id })
     .onConflictDoNothing()
   return agent
+}
+
+// Registered agents not yet members of this workspace (for the add-agent picker).
+export async function listAddableAgents(workspaceId: string) {
+  const memberIds = db
+    .select({ id: schema.memberships.memberId })
+    .from(schema.memberships)
+    .where(
+      and(
+        eq(schema.memberships.workspaceId, workspaceId),
+        eq(schema.memberships.memberType, 'agent'),
+      ),
+    )
+  return db
+    .select()
+    .from(schema.agents)
+    .where(notInArray(schema.agents.id, memberIds))
+    .orderBy(schema.agents.slug)
 }
 
 export type Member = { type: 'user' | 'agent'; id: string; label: string; slug: string }

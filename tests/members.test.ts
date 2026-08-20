@@ -6,6 +6,7 @@ import {
   addAgentToWorkspace,
   approveAccessRequest,
   createWorkspace,
+  listAddableAgents,
   listMembers,
 } from '@/lib/services/workspaces'
 import { ServiceError } from '@/lib/services/errors'
@@ -56,5 +57,15 @@ describe('addAgentToWorkspace (owner-initiated)', () => {
     await expect(
       addAgentToWorkspace({ workspaceId: ws.id, agentSlug: 'no-such-agent-xyz' }),
     ).rejects.toThrowError(ServiceError)
+  })
+
+  it('listAddableAgents excludes agents already in the workspace', async () => {
+    const { agent } = await registerAgent({ name: 'Addable', slug: `addable-${Date.now() % 100000}` })
+    let addable = await listAddableAgents(ws.id)
+    expect(addable.some((a) => a.id === agent.id)).toBe(true)
+
+    await addAgentToWorkspace({ workspaceId: ws.id, agentSlug: agent.slug })
+    addable = await listAddableAgents(ws.id)
+    expect(addable.some((a) => a.id === agent.id)).toBe(false)
   })
 })

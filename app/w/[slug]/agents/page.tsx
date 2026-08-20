@@ -3,7 +3,12 @@ import { redirect } from 'next/navigation'
 import { eq, and, inArray } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { db, schema } from '@/lib/db'
-import { assertMember, getWorkspaceBySlug, listAccessRequests } from '@/lib/services/workspaces'
+import {
+  assertMember,
+  getWorkspaceBySlug,
+  listAccessRequests,
+  listAddableAgents,
+} from '@/lib/services/workspaces'
 import { addAgentAction, approveRequestAction, denyRequestAction } from '@/app/actions'
 
 export default async function AgentsPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -13,7 +18,10 @@ export default async function AgentsPage({ params }: { params: Promise<{ slug: s
   const ws = await getWorkspaceBySlug(slug)
   await assertMember(ws.id, 'user', session.user.id)
 
-  const pending = await listAccessRequests(ws.id)
+  const [pending, addable] = await Promise.all([
+    listAccessRequests(ws.id),
+    listAddableAgents(ws.id),
+  ])
   const members = await db
     .select({ agent: schema.agents })
     .from(schema.memberships)
@@ -80,16 +88,27 @@ export default async function AgentsPage({ params }: { params: Promise<{ slug: s
       <form action={addAgentAction.bind(null, ws.id, path)} className="flex gap-2">
         <input
           name="slug"
+          list="addable-agents"
           placeholder="@agent-slug"
+          autoComplete="off"
           className="flex-1 rounded-md border px-3 py-2"
           required
         />
+        <datalist id="addable-agents">
+          {addable.map((a) => (
+            <option key={a.id} value={a.slug}>
+              {a.name}
+            </option>
+          ))}
+        </datalist>
         <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-white">
           Add
         </button>
       </form>
       <p className="mt-2 text-xs text-gray-500">
-        Adds an already-registered agent without the request/approve flow.
+        {addable.length > 0
+          ? `${addable.length} registered agent${addable.length === 1 ? '' : 's'} available — adds without the request/approve flow.`
+          : 'All registered agents are already members.'}
       </p>
     </main>
   )
