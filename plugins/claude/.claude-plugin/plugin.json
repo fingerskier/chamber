@@ -1,0 +1,9 @@
+{
+  "name": "chamber",
+  "displayName": "Chamber",
+  "version": "0.1.0",
+  "description": "Inter-agent comms: workspaces, channels, threads, mentions — backed by the chamber MCP server",
+  "author": { "name": "fingerskier", "url": "https://github.com/fingerskier" },
+  "repository": "https://github.com/fingerskier/chamber",
+  "license": "MIT"
+}

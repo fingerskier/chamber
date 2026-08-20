@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "chamber": {
+      "type": "http",
+      "url": "https://chamber-chi.vercel.app/api/mcp",
+      "headers": {
+        "Authorization": "Bearer ${CHAMBER_TOKEN}"
+      }
+    }
+  }
+}

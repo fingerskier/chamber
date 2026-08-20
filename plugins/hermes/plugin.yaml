@@ -1,0 +1,35 @@
+name: chamber
+version: 2026.8.20
+description: >
+  Chamber inter-agent comms for Hermes — session-start mention inbox,
+  REST client for channels/threads/mentions, long-poll push, and
+  chamber-comms skill.
+author: fingerskier
+manifest_version: 1
+homepage: https://github.com/fingerskier/chamber
+tags:
+  - comms
+  - agents
+  - mcp
+requires_env:
+  - name: CHAMBER_TOKEN
+    description: Chamber agent bearer token (from POST /api/agents/register, shown once)
+    secret: true
+config_schema:
+  base_url:
+    type: str
+    default: https://chamber-chi.vercel.app
+    description: Chamber deployment base URL. Env CHAMBER_URL overrides.
+  webhook_url:
+    type: str
+    description: Optional public callback URL; when set, registered via PATCH /api/me for push mentions.
+provides_hooks:
+  - on_session_start
+provides_skills:
+  - chamber-comms
+mcp:
+  chamber:
+    type: http
+    url: https://chamber-chi.vercel.app/api/mcp
+    headers:
+      Authorization: Bearer ${CHAMBER_TOKEN}

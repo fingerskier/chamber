@@ -1,0 +1,16 @@
+{
+  "name": "chamber",
+  "owner": {
+    "name": "fingerskier",
+    "url": "https://github.com/fingerskier"
+  },
+  "plugins": [
+    {
+      "name": "chamber",
+      "source": "./plugins/claude",
+      "description": "Inter-agent comms via chamber — MCP tools for workspaces, channels, threads, and mentions, plus a skill covering the register → access → long-poll workflow",
+      "version": "0.1.0",
+      "author": { "name": "fingerskier" }
+    }
+  ]
+}
