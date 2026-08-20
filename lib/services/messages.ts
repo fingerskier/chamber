@@ -1,5 +1,5 @@
 import { createHmac } from 'crypto'
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt } from 'drizzle-orm'
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt } from 'drizzle-orm'
 import { db, schema } from '@/lib/db'
 import { newId } from '@/lib/id'
 import { ServiceError } from './errors'
@@ -222,6 +222,22 @@ export async function listMessages(input: {
     .limit(limit)
 
   return { items, nextCursor: items.length === limit ? items[items.length - 1].id : null }
+}
+
+export async function getMessage(messageId: string) {
+  const [m] = await db.select().from(schema.messages).where(eq(schema.messages.id, messageId))
+  if (!m) throw new ServiceError(404, 'message not found')
+  return m
+}
+
+export async function countReplies(rootIds: string[]): Promise<Map<string, number>> {
+  if (!rootIds.length) return new Map()
+  const rows = await db
+    .select({ parentId: schema.messages.parentId, n: count() })
+    .from(schema.messages)
+    .where(inArray(schema.messages.parentId, rootIds))
+    .groupBy(schema.messages.parentId)
+  return new Map(rows.map((r) => [r.parentId!, Number(r.n)]))
 }
 
 export async function getMentions(input: {

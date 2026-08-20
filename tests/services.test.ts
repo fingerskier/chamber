@@ -7,7 +7,13 @@ import {
   approveAccessRequest,
   listAccessRequests,
 } from '@/lib/services/workspaces'
-import { postMessage, listMessages, getMentions } from '@/lib/services/messages'
+import {
+  postMessage,
+  listMessages,
+  getMentions,
+  getMessage,
+  countReplies,
+} from '@/lib/services/messages'
 import { ServiceError } from '@/lib/services/errors'
 
 let userId: string
@@ -139,6 +145,28 @@ describe('messages', () => {
     const tail = await listMessages({ channelId: c.id, after: ids[1], limit: 10 })
     expect(tail.items.map((m) => m.id)).toEqual([ids[2], ids[3], ids[4]])
     expect(tail.nextCursor).toBeNull()
+  })
+
+  it('getMessage fetches by id; countReplies tallies per root', async () => {
+    const root = await postMessage({
+      channelId: ch.id,
+      senderType: 'user',
+      senderId: userId,
+      content: 'count me',
+    })
+    for (let i = 0; i < 2; i++) {
+      await postMessage({
+        channelId: ch.id,
+        senderType: 'user',
+        senderId: userId,
+        content: `r${i}`,
+        parentId: root.message.id,
+      })
+    }
+    const fetched = await getMessage(root.message.id)
+    expect(fetched.content).toBe('count me')
+    const counts = await countReplies([root.message.id])
+    expect(counts.get(root.message.id)).toBe(2)
   })
 
   it('plain-typed @slug in content creates a mention row for member agents', async () => {
