@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { auth, signIn, signOut } from '@/lib/auth'
 import {
+  addAgentToWorkspace,
   approveAccessRequest,
   assertMember,
   createChannel,
@@ -78,6 +79,15 @@ export async function postMessageAction(
     parentId: parentId ?? undefined,
     mentions,
   })
+  revalidatePath(path)
+}
+
+export async function addAgentAction(workspaceId: string, path: string, formData: FormData) {
+  const userId = await requireUserId()
+  await assertMember(workspaceId, 'user', userId)
+  const slug = String(formData.get('slug') ?? '').trim()
+  if (!slug) return
+  await addAgentToWorkspace({ workspaceId, agentSlug: slug })
   revalidatePath(path)
 }
 

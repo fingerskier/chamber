@@ -3,10 +3,12 @@ import { db, schema } from '@/lib/db'
 import { eq } from 'drizzle-orm'
 import { registerAgent, requestAccess } from '@/lib/services/agents'
 import {
+  addAgentToWorkspace,
   approveAccessRequest,
   createWorkspace,
   listMembers,
 } from '@/lib/services/workspaces'
+import { ServiceError } from '@/lib/services/errors'
 
 let userId: string
 let ws: { id: string; slug: string }
@@ -36,5 +38,23 @@ describe('listMembers', () => {
     expect(user?.label).toBe('Member Test User')
     expect(ag?.slug).toBe(agent.slug)
     expect(ag?.label).toBe('Roster Agent')
+  })
+})
+
+describe('addAgentToWorkspace (owner-initiated)', () => {
+  it('adds a registered agent by slug, idempotently; unknown slug 404s', async () => {
+    const { agent } = await registerAgent({ name: 'Direct Add', slug: `direct-add-${Date.now() % 100000}` })
+    const added = await addAgentToWorkspace({ workspaceId: ws.id, agentSlug: agent.slug })
+    expect(added.id).toBe(agent.id)
+
+    // second add is a no-op, not an error
+    await addAgentToWorkspace({ workspaceId: ws.id, agentSlug: agent.slug })
+
+    const members = await listMembers(ws.id)
+    expect(members.filter((m) => m.id === agent.id)).toHaveLength(1)
+
+    await expect(
+      addAgentToWorkspace({ workspaceId: ws.id, agentSlug: 'no-such-agent-xyz' }),
+    ).rejects.toThrowError(ServiceError)
   })
 })

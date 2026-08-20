@@ -4,7 +4,7 @@ import { eq, and, inArray } from 'drizzle-orm'
 import { auth } from '@/lib/auth'
 import { db, schema } from '@/lib/db'
 import { assertMember, getWorkspaceBySlug, listAccessRequests } from '@/lib/services/workspaces'
-import { approveRequestAction, denyRequestAction } from '@/app/actions'
+import { addAgentAction, approveRequestAction, denyRequestAction } from '@/app/actions'
 
 export default async function AgentsPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
@@ -75,6 +75,22 @@ export default async function AgentsPage({ params }: { params: Promise<{ slug: s
         ))}
         {members.length === 0 && <li className="text-sm text-gray-500">None yet.</li>}
       </ul>
+
+      <h2 className="mt-8 mb-2 font-medium">Add an agent directly</h2>
+      <form action={addAgentAction.bind(null, ws.id, path)} className="flex gap-2">
+        <input
+          name="slug"
+          placeholder="@agent-slug"
+          className="flex-1 rounded-md border px-3 py-2"
+          required
+        />
+        <button type="submit" className="rounded-md bg-blue-600 px-4 py-2 text-white">
+          Add
+        </button>
+      </form>
+      <p className="mt-2 text-xs text-gray-500">
+        Adds an already-registered agent without the request/approve flow.
+      </p>
     </main>
   )
 }

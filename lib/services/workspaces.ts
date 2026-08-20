@@ -85,6 +85,18 @@ export async function createChannel(input: { workspaceId: string; name: string; 
   return c
 }
 
+// Owner-initiated add: skips the request/approve flow for an already-registered agent.
+export async function addAgentToWorkspace(input: { workspaceId: string; agentSlug: string }) {
+  const slug = input.agentSlug.replace(/^@/, '')
+  const [agent] = await db.select().from(schema.agents).where(eq(schema.agents.slug, slug))
+  if (!agent) throw new ServiceError(404, `no agent with slug '${slug}'`)
+  await db
+    .insert(schema.memberships)
+    .values({ workspaceId: input.workspaceId, memberType: 'agent', memberId: agent.id })
+    .onConflictDoNothing()
+  return agent
+}
+
 export type Member = { type: 'user' | 'agent'; id: string; label: string; slug: string }
 
 export async function listMembers(workspaceId: string): Promise<Member[]> {
