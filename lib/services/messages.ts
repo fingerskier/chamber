@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, isNull, lt } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, lt } from 'drizzle-orm'
 import { db, schema } from '@/lib/db'
 import { newId } from '@/lib/id'
 import { ServiceError } from './errors'
@@ -66,9 +66,10 @@ export async function postMessage(input: {
     throw err
   }
 
-  if (input.mentions?.length) {
+  const mentions = await resolveMentions(input.channelId, input.content, input.mentions)
+  if (mentions.length) {
     await db.insert(schema.mentions).values(
-      input.mentions.map((m) => ({
+      mentions.map((m) => ({
         messageId: message.id,
         targetType: m.type,
         targetId: m.id,
@@ -77,6 +78,45 @@ export async function postMessage(input: {
   }
 
   return { message, created: true }
+}
+
+// Structured mentions plus plain-typed @slug tokens resolved against the
+// channel's workspace agents, deduped.
+async function resolveMentions(
+  channelId: string,
+  content: string,
+  explicit: Mention[] = [],
+): Promise<Mention[]> {
+  const typedSlugs = [...new Set([...content.matchAll(/@([\w-]+)/g)].map((m) => m[1]))]
+  const resolved: Mention[] = [...explicit]
+  if (typedSlugs.length) {
+    const [channel] = await db
+      .select()
+      .from(schema.channels)
+      .where(eq(schema.channels.id, channelId))
+    if (channel) {
+      const rows = await db
+        .select({ id: schema.agents.id })
+        .from(schema.agents)
+        .innerJoin(
+          schema.memberships,
+          and(
+            eq(schema.memberships.memberId, schema.agents.id),
+            eq(schema.memberships.memberType, 'agent'),
+            eq(schema.memberships.workspaceId, channel.workspaceId),
+          ),
+        )
+        .where(inArray(schema.agents.slug, typedSlugs))
+      resolved.push(...rows.map((r) => ({ type: 'agent' as const, id: r.id })))
+    }
+  }
+  const seen = new Set<string>()
+  return resolved.filter((m) => {
+    const key = `${m.type}:${m.id}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
 }
 
 async function findByIdempotencyKey(input: {

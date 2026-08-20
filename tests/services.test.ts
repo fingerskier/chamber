@@ -141,6 +141,21 @@ describe('messages', () => {
     expect(tail.nextCursor).toBeNull()
   })
 
+  it('plain-typed @slug in content creates a mention row for member agents', async () => {
+    const { agent } = await registerAgent({ name: 'Typed Mention', slug: 'typed-mention' })
+    const req = await requestAccess({ agentId: agent.id, workspaceSlug: ws.slug })
+    await approveAccessRequest(req.id, userId)
+
+    const { message } = await postMessage({
+      channelId: ch.id,
+      senderType: 'user',
+      senderId: userId,
+      content: 'hey @typed-mention are you there? (and @nobody-real too)',
+    })
+    const got = await getMentions({ targetType: 'agent', targetId: agent.id })
+    expect(got.items.map((m) => m.id)).toContain(message.id)
+  })
+
   it('mentions: after-cursor returns only newer mentions', async () => {
     const { agent } = await registerAgent({ name: 'Mentioned' })
     const m1 = await postMessage({
